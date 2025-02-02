@@ -36,23 +36,15 @@ func (e *ExtismHostFunctions) LookupKubernetesResource(apiVersion string, kind s
 func RenderChartTemplates(input Input) (*Output, error) {
 	hostFunctions := ExtismHostFunctions{}
 
-	pdk.Log(pdk.LogInfo, "debug 1")
-
 	e, err := renderer.NewEngine(&hostFunctions)
 	if err != nil {
-		pdk.Log(pdk.LogInfo, "debug 2")
 		return nil, fmt.Errorf("failed to create gotemplate engine: %w", err)
 	}
 
-	pdk.Log(pdk.LogInfo, "debug 3")
-
 	var values chartutil.Values
 	if err := json.Unmarshal(input.ValuesJSON, &values); err != nil {
-		pdk.Log(pdk.LogInfo, "debug 4")
 		return nil, fmt.Errorf("failed to parse input values json: %w", err)
 	}
-
-	pdk.Log(pdk.LogInfo, "debug 5")
 
 	pdk.Log(pdk.LogInfo, fmt.Sprintf("unmarshelled values: %+v", values))
 

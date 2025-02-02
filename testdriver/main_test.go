@@ -38,8 +38,24 @@ func loadChartDir(t *testing.T, path string) *chart.Chart {
 	return chart
 }
 
-func marshalValuesJSON(t *testing.T, values chartutil.Values) []byte {
-	data, err := json.Marshal(values)
+func makeRenderValues(t *testing.T, chrt *chart.Chart, setValues chartutil.Values) map[string]any {
+
+	options := chartutil.ReleaseOptions{
+		Name:      "test-plugin-release",
+		Namespace: "default",
+		Revision:  1,
+		IsInstall: true,
+		IsUpgrade: false,
+	}
+	renderValues, err := chartutil.ToRenderValuesWithSchemaValidation(chrt, setValues, options, nil, false)
+	require.Nil(t, err)
+
+	return renderValues
+}
+
+func marshalValuesJSON(t *testing.T, renderValues chartutil.Values) []byte {
+
+	data, err := json.Marshal(renderValues)
 	require.Nil(t, err)
 
 	return data
@@ -91,14 +107,14 @@ func TestRenderChart(t *testing.T) {
 		fmt.Printf("%s %s: %s\n", time.Now().Format(time.RFC3339), logLevel.String(), s)
 	})
 
-	fmt.Println("executing")
 	testValues := chartutil.Values{
 		"replicas": 3,
 	}
 
+	chrt := loadChartDir(t, "testdata/testchart")
 	input := RendererPluginInput{
-		Chart:      loadChartDir(t, "testdata/testchart"),
-		ValuesJSON: marshalValuesJSON(t, testValues),
+		Chart:      chrt,
+		ValuesJSON: marshalValuesJSON(t, makeRenderValues(t, chrt, testValues)),
 	}
 
 	inputData, err := json.Marshal(input)
@@ -109,8 +125,6 @@ func TestRenderChart(t *testing.T) {
 	require.Nil(t, err, "exitCode=%d plugin error=%s", exitCode, plugin.GetError())
 	assert.Equal(t, uint32(0), exitCode)
 
-	fmt.Printf("output data: %q\n", outputData)
-
 	output := RendererPluginOutput{}
 	{
 		err := json.Unmarshal(outputData, &output)
@@ -118,5 +132,4 @@ func TestRenderChart(t *testing.T) {
 	}
 
 	fmt.Printf("output: %+v\n", output)
-	assert.Fail(t, "stonk")
 }

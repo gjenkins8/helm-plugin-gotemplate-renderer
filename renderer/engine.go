@@ -99,13 +99,13 @@ func NewEngine(hostFunctions HostFunctions, options ...EngineOption) (*Engine, e
 		return nil, fmt.Errorf("error creating engine: %w", err)
 	}
 
-	t := template.New("gotpl")
+	e.goTemplate = template.New("gotpl")
 	if e.options.Strict {
-		t.Option("missingkey=error")
+		e.goTemplate.Option("missingkey=error")
 	} else {
 		// Not that zero will attempt to add default values for types it knows,
 		// but will still emit <no value> for others. We mitigate that later.
-		t.Option("missingkey=zero")
+		e.goTemplate.Option("missingkey=zero")
 	}
 
 	e.initFunMap()
@@ -159,7 +159,7 @@ func warnWrap(warn string) string {
 
 // 'include' needs to be defined in the scope of a 'tpl' template as
 // well as regular file-loaded templates.
-func includeFun(t *template.Template, includedNames map[string]int) func(string, interface{}) (string, error) {
+func includeFun(goTemplate *template.Template, includedNames map[string]int) func(string, interface{}) (string, error) {
 	return func(name string, data interface{}) (string, error) {
 		var buf strings.Builder
 		if v, ok := includedNames[name]; ok {
@@ -170,7 +170,7 @@ func includeFun(t *template.Template, includedNames map[string]int) func(string,
 		} else {
 			includedNames[name] = 1
 		}
-		err := t.ExecuteTemplate(&buf, name, data)
+		err := goTemplate.ExecuteTemplate(&buf, name, data)
 		includedNames[name]--
 		return buf.String(), err
 	}
