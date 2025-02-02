@@ -30,7 +30,48 @@ type ExtismHostFunctions struct {
 
 func (e *ExtismHostFunctions) LookupKubernetesResource(apiVersion string, kind string, namespace string, name string) (map[string]interface{}, error) {
 	pdk.Log(pdk.LogInfo, fmt.Sprintf("received unimplemented lookup: %q %q %q %q", apiVersion, kind, namespace, name))
-	return map[string]any{}, nil
+
+	memApiVersion := pdk.AllocateString(apiVersion)
+	memKind := pdk.AllocateString(kind)
+	memNamespace := pdk.AllocateString(namespace)
+	memName := pdk.AllocateString(name)
+
+	resultPtr := extismKubernetesResourceLookup(
+		extismPointer(memApiVersion.Offset()),
+		extismPointer(memKind.Offset()),
+		extismPointer(memNamespace.Offset()),
+		extismPointer(memName.Offset()),
+	)
+
+	resultMem := pdk.FindMemory(uint64(resultPtr))
+
+	type lookupKubernetesResourceResult struct {
+		Error  *string        `json:"error,omitempty"`
+		Result map[string]any `json:"result"`
+	}
+
+	result := lookupKubernetesResourceResult{}
+	if err := json.Unmarshal(resultMem.ReadBytes(), &result); err != nil {
+		return nil, fmt.Errorf("failed to deserialize LookupKubernetesResource return json: %w", err)
+	}
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("host error: %s", *result.Error)
+	}
+
+	return result.Result, nil
+}
+
+func (e *ExtismHostFunctions) ResolveHostname(hostname string) string {
+	memHostname := pdk.AllocateString(hostname)
+
+	resultPtr := extismResolveHostname(
+		extismPointer(memHostname.Offset()),
+	)
+
+	resultMem := pdk.FindMemory(uint64(resultPtr))
+
+	return string(resultMem.ReadBytes())
 }
 
 func RenderChartTemplates(input Input) (*Output, error) {

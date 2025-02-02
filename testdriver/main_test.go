@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 	"helm.sh/helm/v4/pkg/chart"
 	chartloader "helm.sh/helm/v4/pkg/chart/loader"
 	"helm.sh/helm/v4/pkg/chartutil"
@@ -97,7 +98,56 @@ func TestRenderChart(t *testing.T) {
 		//ObserveAdapter: ,
 		//ObserveOptions: &observe.Options{},
 	}
-	plugin, err := extism.NewPlugin(ctx, manifest, config, []extism.HostFunction{})
+	plugin, err := extism.NewPlugin(ctx, manifest, config, []extism.HostFunction{
+		extism.NewHostFunctionWithStack(
+			"kubernetes_resource_lookup",
+			func(ctx context.Context, plugin *extism.CurrentPlugin, stack []uint64) {
+				// TODO error checks
+				apiVersion, _ := plugin.ReadString(stack[0])
+				kind, _ := plugin.ReadString(stack[1])
+				namespace, _ := plugin.ReadString(stack[2])
+				name, _ := plugin.ReadString(stack[3])
+
+				_ = plugin.Free(stack[0])
+				_ = plugin.Free(stack[1])
+				_ = plugin.Free(stack[2])
+				_ = plugin.Free(stack[3])
+
+				fmt.Printf("received unimplemented lookup: %q %q %q %q\n", apiVersion, kind, namespace, name)
+
+				type lookupKubernetesResourceResult struct {
+					Error  *string        `json:"error,omitempty"`
+					Result map[string]any `json:"result"`
+				}
+
+				result := lookupKubernetesResourceResult{}
+				resultData, _ := json.Marshal(&result)
+
+				resultBytes, _ := plugin.WriteBytes(resultData)
+				stack[0] = resultBytes
+			},
+			[]api.ValueType{
+				api.ValueTypeI64, // apiGroup
+				api.ValueTypeI64, // kind
+				api.ValueTypeI64, // name
+				api.ValueTypeI64, // namespace
+			},
+			[]api.ValueType{
+				api.ValueTypeI64,
+			},
+		),
+		extism.NewHostFunctionWithStack(
+			"resolve_hostname",
+			func(ctx context.Context, plugin *extism.CurrentPlugin, stack []uint64) {
+			},
+			[]api.ValueType{
+				api.ValueTypeI64, // apiGroup
+			},
+			[]api.ValueType{
+				api.ValueTypeI64,
+			},
+		),
+	})
 	if err != nil {
 		fmt.Printf("Failed to initialize plugin: %v\n", err)
 		os.Exit(1)
@@ -132,4 +182,5 @@ func TestRenderChart(t *testing.T) {
 	}
 
 	fmt.Printf("output: %+v\n", output)
+	assert.Fail(t, "forced failure")
 }

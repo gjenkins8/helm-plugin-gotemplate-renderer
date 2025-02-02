@@ -79,6 +79,7 @@ func WithLintMode(enable bool) EngineOption {
 
 type HostFunctions interface {
 	LookupKubernetesResource(apiversion string, kind string, namespace string, name string) (map[string]interface{}, error)
+	ResolveHostname(hostname string) string
 }
 
 // New creates a new instance of Engine using the passed in rest config.
@@ -269,13 +270,18 @@ func (e *Engine) initFunMap() {
 		funcMap["lookup"] = e.hostFunctions.LookupKubernetesResource
 	}
 
-	// When DNS lookups are not enabled override the sprig function and return
-	// an empty string.
-	if !e.options.EnableDNS {
-		funcMap["getHostByName"] = func(_ string) string {
+	funcMap["getHostByName"] = func() func(string) string {
+		// When DNS lookups are not enabled override the sprig function and return
+		// an empty string.
+		if e.options.EnableDNS {
+			return e.hostFunctions.ResolveHostname
+		}
+
+		return func(_ string) string {
 			return ""
 		}
-	}
+
+	}()
 
 	e.goTemplate.Funcs(funcMap)
 }
