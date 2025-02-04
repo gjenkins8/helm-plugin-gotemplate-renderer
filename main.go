@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 
 	pdk "github.com/extism/go-pdk"
 	renderer "github.com/helm/helm-plugin-gotemplate-renderer/renderer"
@@ -125,11 +124,14 @@ func RunPlugin() error {
 	return nil
 }
 
-func main() {
+//go:wasmexport helm_chart_renderer
+func HelmChartRenderer() uint64 {
 	pdk.Log(pdk.LogDebug, "running gotemplate-renderer plugins")
 	if err := RunPlugin(); err != nil {
 		pdk.Log(pdk.LogError, err.Error())
 		pdk.SetError(err)
-		os.Exit(1)
+		return 1
 	}
+
+	return 0
 }

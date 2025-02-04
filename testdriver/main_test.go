@@ -171,7 +171,7 @@ func TestRenderChart(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, inputData)
 
-	exitCode, outputData, err := plugin.Call("_start", inputData)
+	exitCode, outputData, err := plugin.Call("helm_chart_renderer", inputData)
 	require.Nil(t, err, "exitCode=%d plugin error=%s", exitCode, plugin.GetError())
 	assert.Equal(t, uint32(0), exitCode)
 
