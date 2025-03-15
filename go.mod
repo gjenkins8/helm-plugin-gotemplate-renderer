@@ -1,8 +1,6 @@
 module github.com/helm/helm-plugin-gotemplate-renderer
 
-go 1.23.0
-
-toolchain go1.23.5
+go 1.24.0
 
 require (
 	github.com/BurntSushi/toml v1.4.0
@@ -11,6 +9,7 @@ require (
 	github.com/extism/go-sdk v1.6.1
 	github.com/gobwas/glob v0.2.3
 	github.com/stretchr/testify v1.10.0
+	github.com/tetratelabs/wazero v1.8.1-0.20240916092830-1353ca24fef0
 	helm.sh/helm/v4 v4.0.0-20250131171042-d2c9b3d18aa4
 	k8s.io/helm v2.17.0+incompatible
 	sigs.k8s.io/yaml v1.4.0
@@ -43,7 +42,6 @@ require (
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/spf13/cast v1.7.0 // indirect
 	github.com/tetratelabs/wabin v0.0.0-20230304001439-f6f874872834 // indirect
-	github.com/tetratelabs/wazero v1.8.1-0.20240916092830-1353ca24fef0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
