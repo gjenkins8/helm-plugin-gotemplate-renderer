@@ -28,7 +28,6 @@ type ExtismHostFunctions struct {
 }
 
 func (e *ExtismHostFunctions) LookupKubernetesResource(apiVersion string, kind string, namespace string, name string) (map[string]interface{}, error) {
-	pdk.Log(pdk.LogInfo, fmt.Sprintf("received unimplemented lookup: %q %q %q %q", apiVersion, kind, namespace, name))
 
 	memApiVersion := pdk.AllocateString(apiVersion)
 	memKind := pdk.AllocateString(kind)
@@ -110,7 +109,6 @@ func RunPlugin() error {
 		return fmt.Errorf("failed to parse input json: %w", err)
 	}
 
-	pdk.Log(pdk.LogInfo, fmt.Sprintf("parsed input: %+v", input))
 	output, err := RenderChartTemplates(input)
 	if err != nil {
 		pdk.Log(pdk.LogError, fmt.Sprintf("failed: %s", err.Error()))
@@ -126,7 +124,9 @@ func RunPlugin() error {
 
 //go:wasmexport helm_chart_renderer
 func HelmChartRenderer() uint64 {
-	pdk.Log(pdk.LogDebug, "running gotemplate-renderer plugins")
+
+	pdk.Log(pdk.LogDebug, "running gotemplate-renderer plugin")
+
 	if err := RunPlugin(); err != nil {
 		pdk.Log(pdk.LogError, err.Error())
 		pdk.SetError(err)
