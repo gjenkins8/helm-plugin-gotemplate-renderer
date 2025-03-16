@@ -69,7 +69,7 @@ func WithStrict(enable bool) EngineOption {
 // Lint mode:
 // - disables 'required' template function (as values may be missing, so don't fail)
 // - disables the 'fail' template function
-// - disbales the 'lookup' template function
+// - disables the 'lookup' template function
 func WithLintMode(enable bool) EngineOption {
 	return func(e *Engine) error {
 		e.options.LintMode = enable
@@ -78,7 +78,7 @@ func WithLintMode(enable bool) EngineOption {
 }
 
 type HostFunctions interface {
-	LookupKubernetesResource(apiversion string, kind string, namespace string, name string) (map[string]interface{}, error)
+	LookupKubernetesResource(apiversion string, kind string, namespace string, name string) (map[string]any, error)
 	ResolveHostname(hostname string) string
 }
 
@@ -306,6 +306,10 @@ func (e *Engine) renderTemplates(tpls map[string]renderable) (map[string]string,
 		// Don't render partials. We don't care out the direct output of partials.
 		// They are only included from other templates.
 		if strings.HasPrefix(path.Base(filename), "_") {
+			continue
+		}
+
+		if path.Base(filename) == "NOTES.txt" { // TODO: hack
 			continue
 		}
 

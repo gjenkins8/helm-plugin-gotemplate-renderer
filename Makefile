@@ -9,10 +9,10 @@ gotemplate-renderer.wasm: $(PKG_SOURCE_FILES)
 
 build: gotemplate-renderer.wasm
 
-TEST_FLAGS?= # -cpuprofile cpu.prof -memprofile mem.prof # -bench
+TEST_FLAGS?= -cpuprofile cpu.prof -memprofile mem.prof -bench
 
 test: gotemplate-renderer.wasm
-	go test $(TEST_FLAGS) ./testdriver/
+	cd testdriver/ && go test $(TEST_FLAGS) ./...
 
 vet:
 	GOOS=wasip1 GOARCH=wasm go vet ./...

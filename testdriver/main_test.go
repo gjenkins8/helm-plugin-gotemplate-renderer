@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
+	"runtime"
+	"runtime/pprof"
 	"testing"
 	"time"
 
@@ -240,7 +243,6 @@ func BenchmarkRenderChart_SimpleChart(b *testing.B) {
 			b.Fail()
 		}
 	}
-
 }
 
 func BenchmarkRenderChart_GitlabChart(b *testing.B) {
@@ -255,10 +257,39 @@ func BenchmarkRenderChart_GitlabChart(b *testing.B) {
 
 	testChart := testCharts["gitlab"]
 
+	{
+		f, err := os.Create("cpu.prof")
+		if err != nil {
+			log.Fatal("could not create CPU profile: ", err)
+		}
+		defer f.Close() // error handling omitted for example
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatal("could not start CPU profile: ", err)
+		}
+		defer pprof.StopCPUProfile()
+	}
+
+	renderChart(plugin, testChart.Chart, testChart.TestValues)
+
 	for b.Loop() {
 		err := renderChart(plugin, testChart.Chart, testChart.TestValues)
 		if err != nil {
 			b.Fail()
+		}
+	}
+
+	{
+		f, err := os.Create("mem.prof")
+		if err != nil {
+			log.Fatal("could not create memory profile: ", err)
+		}
+		defer f.Close() // error handling omitted for example
+		runtime.GC()    // get up-to-date statistics
+		// Lookup("allocs") creates a profile similar to go test -memprofile.
+		// Alternatively, use Lookup("heap") for a profile
+		// that has inuse_space as the default index.
+		if err := pprof.Lookup("allocs").WriteTo(f, 0); err != nil {
+			log.Fatal("could not write memory profile: ", err)
 		}
 	}
 
@@ -286,10 +317,13 @@ func renderChart(plugin *extism.Plugin, chrt *chart.Chart, testValues map[string
 		return err
 	}
 
+	start := time.Now()
 	exitCode, outputData, err := plugin.Call("helm_chart_renderer", inputData)
 	if err != nil {
 		return err
 	}
+	end := time.Now()
+	log.Printf("plugin call duration: %s\n", end.Sub(start))
 
 	if exitCode != 0 {
 		return fmt.Errorf("plugin failed: exit code = %d", exitCode)
