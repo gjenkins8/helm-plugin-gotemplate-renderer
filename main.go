@@ -5,7 +5,8 @@ import (
 	"fmt"
 
 	pdk "github.com/extism/go-pdk"
-	renderer "github.com/helm/helm-plugin-gotemplate-renderer/renderer"
+	"github.com/helm/helm-plugin-gotemplate-renderer/pkg/engine"
+	"github.com/helm/helm-plugin-gotemplate-renderer/pkg/release"
 	chart "helm.sh/helm/v4/pkg/chart/v2"
 )
 
@@ -74,7 +75,8 @@ func (e *ExtismHostFunctions) ResolveHostname(hostname string) string {
 func RenderChartTemplates(input Input) (*Output, error) {
 	hostFunctions := ExtismHostFunctions{}
 
-	e, err := renderer.NewEngine(&hostFunctions)
+	//e, err := renderer.NewEngine(&hostFunctions, renderer.WithDNS(true))
+	e, err := engine.NewEngine(&hostFunctions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gotemplate engine: %w", err)
 	}
@@ -86,9 +88,9 @@ func RenderChartTemplates(input Input) (*Output, error) {
 
 	chrt := input.Chart
 
-	//if err := chartutil.ProcessDependencies(chrt, vals); err != nil {
-	//	return nil, fmt.Errorf("chart dependencies processing failed: %w", err)
-	//}
+	if err := release.ProcessDependencies(chrt, vals); err != nil {
+		return nil, fmt.Errorf("chart dependencies processing failed: %w", err)
+	}
 
 	renderedManifests, err := e.RenderAllChartTemplates(chrt, vals)
 	if err != nil {
