@@ -27,7 +27,7 @@ import (
 	"strings"
 	"text/template"
 
-	"helm.sh/helm/v4/pkg/chart"
+	chart "helm.sh/helm/v4/pkg/chart/v2"
 )
 
 // Engine is an implementation of the Helm rendering implementation for templates.

@@ -6,7 +6,7 @@ import (
 
 	pdk "github.com/extism/go-pdk"
 	renderer "github.com/helm/helm-plugin-gotemplate-renderer/renderer"
-	"helm.sh/helm/v4/pkg/chart"
+	chart "helm.sh/helm/v4/pkg/chart/v2"
 )
 
 type Input struct {
