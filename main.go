@@ -7,7 +7,6 @@ import (
 	pdk "github.com/extism/go-pdk"
 	renderer "github.com/helm/helm-plugin-gotemplate-renderer/renderer"
 	"helm.sh/helm/v4/pkg/chart"
-	"k8s.io/helm/pkg/chartutil"
 )
 
 type Input struct {
@@ -80,14 +79,18 @@ func RenderChartTemplates(input Input) (*Output, error) {
 		return nil, fmt.Errorf("failed to create gotemplate engine: %w", err)
 	}
 
-	var values chartutil.Values
-	if err := json.Unmarshal(input.ValuesJSON, &values); err != nil {
+	var vals map[string]any
+	if err := json.Unmarshal(input.ValuesJSON, &vals); err != nil {
 		return nil, fmt.Errorf("failed to parse input values json: %w", err)
 	}
 
-	pdk.Log(pdk.LogInfo, fmt.Sprintf("unmarshelled values: %+v", values))
+	chrt := input.Chart
 
-	renderedManifests, err := e.RenderAllChartTemplates(input.Chart, values)
+	//if err := chartutil.ProcessDependencies(chrt, vals); err != nil {
+	//	return nil, fmt.Errorf("chart dependencies processing failed: %w", err)
+	//}
+
+	renderedManifests, err := e.RenderAllChartTemplates(chrt, vals)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render chart templates: %w", err)
 	}

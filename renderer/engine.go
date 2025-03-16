@@ -28,7 +28,6 @@ import (
 	"text/template"
 
 	"helm.sh/helm/v4/pkg/chart"
-	"k8s.io/helm/pkg/chartutil"
 )
 
 // Engine is an implementation of the Helm rendering implementation for templates.
@@ -133,7 +132,7 @@ func NewEngine(hostFunctions HostFunctions, options ...EngineOption) (*Engine, e
 // that section of the values will be passed into the "foo" chart. And if that
 // section contains a value named "bar", that value will be passed on to the
 // bar chart during render time.
-func (e *Engine) RenderAllChartTemplates(chrt *chart.Chart, values chartutil.Values) (map[string]string, error) {
+func (e *Engine) RenderAllChartTemplates(chrt *chart.Chart, values ChartValues) (map[string]string, error) {
 	tmap := allTemplates(chrt, values)
 	return e.renderTemplates(tmap)
 }
@@ -143,7 +142,7 @@ type renderable struct {
 	// tpl is the current template.
 	tpl string
 	// vals are the values to be supplied to the template.
-	vals chartutil.Values
+	vals ChartValues
 	// namespace prefix to the templates of the current chart
 	basePath string
 }
@@ -338,7 +337,7 @@ func (e *Engine) renderTemplate(filename string, renderable renderable) (result 
 
 	// At render time, add information about the template that is being rendered.
 	vals := renderable.vals
-	vals["Template"] = chartutil.Values{"Name": filename, "BasePath": renderable.basePath}
+	vals["Template"] = ChartValues{"Name": filename, "BasePath": renderable.basePath}
 	var buf strings.Builder
 	if err := e.goTemplate.ExecuteTemplate(&buf, filename, vals); err != nil {
 		return "", cleanupExecError(filename, err)
@@ -416,7 +415,7 @@ func (p byPathLen) Less(i, j int) bool {
 // allTemplates returns all templates for a chart and its dependencies.
 //
 // As it goes, it also prepares the values in a scope-sensitive manner.
-func allTemplates(c *chart.Chart, vals chartutil.Values) map[string]renderable {
+func allTemplates(c *chart.Chart, vals ChartValues) map[string]renderable {
 	templates := make(map[string]renderable)
 	recAllTpls(c, templates, vals)
 	return templates
@@ -426,20 +425,20 @@ func allTemplates(c *chart.Chart, vals chartutil.Values) map[string]renderable {
 //
 // As it recurses, it also sets the values to be appropriate for the template
 // scope.
-func recAllTpls(c *chart.Chart, templates map[string]renderable, vals chartutil.Values) map[string]interface{} {
+func recAllTpls(c *chart.Chart, templates map[string]renderable, vals ChartValues) map[string]interface{} {
 	subCharts := make(map[string]interface{})
 	chartMetaData := struct {
 		chart.Metadata
 		IsRoot bool
 	}{*c.Metadata, c.IsRoot()}
 
-	next := map[string]interface{}{
-		"Chart":            chartMetaData,
-		"Files":            newFiles(c.Files),
-		"Release":          vals["Release"],
-		"Capabilities":     vals["Capabilities"],
-		"chartutil.Values": make(chartutil.Values),
-		"Subcharts":        subCharts,
+	next := map[string]any{
+		"Chart":        chartMetaData,
+		"Files":        newFiles(c.Files),
+		"Release":      vals["Release"],
+		"Capabilities": vals["Capabilities"],
+		"Values":       make(ChartValues),
+		"Subcharts":    subCharts,
 	}
 
 	// If there is a {{.Values.ThisChart}} in the parent metadata,
