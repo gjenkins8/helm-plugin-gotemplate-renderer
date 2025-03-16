@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	pdk "github.com/extism/go-pdk"
 	"github.com/helm/helm-plugin-gotemplate-renderer/pkg/engine"
@@ -109,6 +110,7 @@ func RenderChartTemplates(input Input) (*Output, error) {
 }
 
 func RunPlugin() error {
+
 	var input Input
 	if err := pdk.InputJSON(&input); err != nil {
 		return fmt.Errorf("failed to parse input json: %w", err)
@@ -130,6 +132,9 @@ func RunPlugin() error {
 //go:wasmexport helm_chart_renderer
 func HelmChartRenderer() uint64 {
 
+	d := time.Duration(0)
+	start := time.Now()
+
 	pdk.Log(pdk.LogDebug, "running gotemplate-renderer plugin")
 
 	if err := RunPlugin(); err != nil {
@@ -137,6 +142,10 @@ func HelmChartRenderer() uint64 {
 		pdk.SetError(err)
 		return 1
 	}
+
+	end := time.Now()
+	d += end.Sub(start)
+	pdk.Log(pdk.LogInfo, fmt.Sprintf("HelmChartRenderer duration=%s", d))
 
 	return 0
 }
