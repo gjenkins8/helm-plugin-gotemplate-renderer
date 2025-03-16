@@ -32,14 +32,64 @@ type RendererPluginOutput struct {
 	Manifests []RendererPluginOutputManifest `json:"manifests"`
 }
 
-func loadChartDir(t *testing.T, path string) *chart.Chart {
-	chart, err := chartloader.LoadDir(path)
-	require.Nil(t, err)
-
-	return chart
+type testChart struct {
+	Chart      *chart.Chart
+	TestValues map[string]any
 }
 
-func makeRenderValues(t *testing.T, chrt *chart.Chart, setValues chartutil.Values) map[string]any {
+var testCharts map[string]testChart
+
+func init() {
+
+	loadGitlabChart := func() *chart.Chart {
+		f, err := os.Open("testdata/gitlab-8.9.2.tgz")
+		if err != nil {
+			panic(err)
+		}
+
+		gitLabChart, err := chartloader.LoadArchive(f)
+		if err != nil {
+			panic(err)
+		}
+
+		return gitLabChart
+	}
+
+	loadSimpleChart := func() *chart.Chart {
+
+		chrt, err := chartloader.LoadDir("testdata/simple_chart")
+		if err != nil {
+			panic(err)
+		}
+
+		return chrt
+	}
+
+	testCharts = map[string]testChart{
+		"simple": {
+			Chart: loadSimpleChart(),
+			TestValues: chartutil.Values{
+				"replicas": 3,
+			},
+		},
+		"gitlab": {
+			Chart: loadGitlabChart(),
+			TestValues: chartutil.Values{
+				"global": map[string]any{
+					"hosts": map[string]any{
+						"domain":     "example.com",
+						"externalIP": "10.10.10.10",
+					},
+				},
+				"certmanager-issuer": map[string]any{
+					"email": "me@example.com",
+				},
+			},
+		},
+	}
+}
+
+func makeRenderValues(chrt *chart.Chart, setValues chartutil.Values) (map[string]any, error) {
 
 	options := chartutil.ReleaseOptions{
 		Name:      "test-plugin-release",
@@ -48,35 +98,30 @@ func makeRenderValues(t *testing.T, chrt *chart.Chart, setValues chartutil.Value
 		IsInstall: true,
 		IsUpgrade: false,
 	}
+
 	renderValues, err := chartutil.ToRenderValuesWithSchemaValidation(chrt, setValues, options, nil, false)
-	require.Nil(t, err)
 
-	return renderValues
-}
-
-func marshalValuesJSON(t *testing.T, renderValues chartutil.Values) []byte {
-
-	data, err := json.Marshal(renderValues)
-	require.Nil(t, err)
-
-	return data
+	return renderValues, err
 }
 
 func init() {
 	extism.SetLogLevel(extism.LogLevelDebug)
 }
 
-func TestRenderChart(t *testing.T) {
-
-	pluginBytes, err := os.ReadFile("../gotemplate-renderer.wasm")
-	require.Nil(t, err)
+func loadFilePlugin(ctx context.Context, pluginPath string) (*extism.Plugin, error) {
+	//pluginBytes, err := os.ReadFile(plugnPath)
+	//require.Nil(t, err)
 
 	manifest := extism.Manifest{
 		Wasm: []extism.Wasm{
-			extism.WasmData{
-				Data: pluginBytes,
+			extism.WasmFile{
+				Path: pluginPath,
 				Name: "gotemplate-renderer",
 			},
+			//extism.WasmData{
+			//	Data: pluginBytes,
+			//	Name: "gotemplate-renderer",
+			//},
 		},
 		Memory: &extism.ManifestMemory{
 			MaxPages: 65535,
@@ -89,7 +134,6 @@ func TestRenderChart(t *testing.T) {
 		Timeout:      0,
 	}
 
-	ctx := context.Background()
 	config := extism.PluginConfig{
 		ModuleConfig:  wazero.NewModuleConfig().WithSysWalltime(),
 		RuntimeConfig: wazero.NewRuntimeConfig().WithCloseOnContextDone(false),
@@ -98,6 +142,7 @@ func TestRenderChart(t *testing.T) {
 		//ObserveAdapter: ,
 		//ObserveOptions: &observe.Options{},
 	}
+
 	plugin, err := extism.NewPlugin(ctx, manifest, config, []extism.HostFunction{
 		extism.NewHostFunctionWithStack(
 			"kubernetes_resource_lookup",
@@ -149,38 +194,113 @@ func TestRenderChart(t *testing.T) {
 		),
 	})
 	if err != nil {
-		fmt.Printf("Failed to initialize plugin: %v\n", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("failed to initialize plugin: %w", err)
 	}
 
 	plugin.SetLogger(func(logLevel extism.LogLevel, s string) {
 		fmt.Printf("%s %s: %s\n", time.Now().Format(time.RFC3339), logLevel.String(), s)
 	})
 
-	testValues := chartutil.Values{
-		"replicas": 3,
+	return plugin, nil
+}
+
+func TestRenderChart(t *testing.T) {
+
+	ctx := context.Background()
+
+	pluginPath := "../gotemplate-renderer.wasm"
+	plugin, err := loadFilePlugin(ctx, pluginPath)
+	require.Nil(t, err)
+
+	for chartName, testChart := range testCharts {
+		t.Run(chartName, func(t *testing.T) {
+
+			err := renderChart(plugin, testChart.Chart, testChart.TestValues)
+			assert.Nil(t, err)
+		})
+	}
+	//assert.Fail(t, "fail", "time taken: %s", end.Sub(start))
+}
+
+func BenchmarkRenderChart_SimpleChart(b *testing.B) {
+
+	ctx := context.Background()
+
+	pluginPath := "../gotemplate-renderer.wasm"
+	plugin, err := loadFilePlugin(ctx, pluginPath)
+	if err != nil {
+		b.Fail()
 	}
 
-	chrt := loadChartDir(t, "testdata/testchart")
+	testChart := testCharts["simple"]
+
+	for b.Loop() {
+		err := renderChart(plugin, testChart.Chart, testChart.TestValues)
+		if err != nil {
+			b.Fail()
+		}
+	}
+
+}
+
+func BenchmarkRenderChart_GitlabChart(b *testing.B) {
+
+	ctx := context.Background()
+
+	pluginPath := "../gotemplate-renderer.wasm"
+	plugin, err := loadFilePlugin(ctx, pluginPath)
+	if err != nil {
+		b.Fail()
+	}
+
+	testChart := testCharts["gitlab"]
+
+	for b.Loop() {
+		err := renderChart(plugin, testChart.Chart, testChart.TestValues)
+		if err != nil {
+			b.Fail()
+		}
+	}
+
+}
+
+func renderChart(plugin *extism.Plugin, chrt *chart.Chart, testValues map[string]any) error {
+
+	renderValues, err := makeRenderValues(chrt, testValues)
+	if err != nil {
+		return err
+	}
+
+	renderValuesJSON, err := json.Marshal(renderValues)
+	if err != nil {
+		return err
+	}
+
 	input := RendererPluginInput{
 		Chart:      chrt,
-		ValuesJSON: marshalValuesJSON(t, makeRenderValues(t, chrt, testValues)),
+		ValuesJSON: renderValuesJSON,
 	}
 
 	inputData, err := json.Marshal(input)
-	require.Nil(t, err)
-	require.NotEmpty(t, inputData)
-
-	exitCode, outputData, err := plugin.Call("helm_chart_renderer", inputData)
-	require.Nil(t, err, "exitCode=%d plugin error=%s", exitCode, plugin.GetError())
-	assert.Equal(t, uint32(0), exitCode)
-
-	output := RendererPluginOutput{}
-	{
-		err := json.Unmarshal(outputData, &output)
-		assert.Nil(t, err)
+	if err != nil {
+		return err
 	}
 
-	fmt.Printf("output: %+v\n", output)
-	assert.Fail(t, "forced failure")
+	exitCode, outputData, err := plugin.Call("helm_chart_renderer", inputData)
+	if err != nil {
+		return err
+	}
+
+	if exitCode != 0 {
+		return fmt.Errorf("plugin failed: exit code = %d", exitCode)
+	}
+
+	output := RendererPluginOutput{}
+	if err := json.Unmarshal(outputData, &output); err != nil {
+		return err
+	}
+
+	return nil
+	//fmt.Printf("output: %+v\n", output)
+	//assert.Fail(t, "forced failure")
 }
